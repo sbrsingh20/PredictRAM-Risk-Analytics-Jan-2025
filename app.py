@@ -1,6 +1,7 @@
 import pandas as pd
 import streamlit as st
 import plotly.express as px
+import plotly.graph_objects as go
 
 # Read data from the original Excel file
 file_path = "merged_stock_data_with_categories_in_cells_nov2024.xlsx"
@@ -179,7 +180,32 @@ metrics_data = metrics_df[metrics_df['Stock Symbol'].isin(selected_stocks)][[
 ]].to_dict('records')
 st.dataframe(metrics_data)
 
-# Display risk graph
+# Display risk graphs for each parameter (Market Risk, Financial Risk, Liquidity Risk)
+def plot_risk_graphs(results, category):
+    # Filter results by category
+    filtered_results = [r for r in results if r['Category'] == category]
+    param_counts = {}
+
+    for result in filtered_results:
+        param = result['Parameter']
+        risk_level = result['Risk Level']
+        if param not in param_counts:
+            param_counts[param] = {"Good": 0, "Neutral": 0, "Bad": 0, "Data not available": 0}
+        param_counts[param][risk_level] += 1
+
+    # Create a bar chart for each parameter
+    for param, counts in param_counts.items():
+        fig = go.Figure()
+        fig.add_trace(go.Bar(x=list(counts.keys()), y=list(counts.values()), name=param))
+        fig.update_layout(title=f"Risk Distribution for {param} in {category}", xaxis_title="Risk Level", yaxis_title="Count")
+        st.plotly_chart(fig)
+
+# Display risk parameter graphs for each category
+st.subheader("Risk Distribution by Parameter")
+for category in risk_categories.keys():
+    plot_risk_graphs(results, category)
+
+# Display investment score bar chart
 investment_data = [{"Stock Symbol": stock, "Investment Score": score} for stock, score in stock_scores.items()]
 investment_df = pd.DataFrame(investment_data)
 fig = px.bar(investment_df, x="Stock Symbol", y="Investment Score", title="Investment Scores for Selected Stocks")
