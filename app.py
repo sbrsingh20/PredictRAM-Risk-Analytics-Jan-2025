@@ -141,6 +141,12 @@ for category, score in category_scores.items():
     summary_text += f"{category}: {score}\n"
 st.text(summary_text)
 
+# Display the table of risk parameters
+st.subheader("Risk Parameters Table")
+# Convert the results list to a DataFrame for display
+risk_df = pd.DataFrame(results)
+st.dataframe(risk_df)
+
 # Add Risk Meter (Example for one stock)
 def plot_risk_meter(stock_symbol):
     stock_info = df[df['Stock Symbol'] == stock_symbol].iloc[0]
