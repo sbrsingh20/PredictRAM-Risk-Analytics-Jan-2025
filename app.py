@@ -2,6 +2,7 @@ import pandas as pd
 import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
+import numpy as np
 
 # Read data from the original Excel file
 file_path = "merged_stock_data_with_categories_in_cells_nov2024.xlsx"
@@ -140,79 +141,80 @@ for category, score in category_scores.items():
     summary_text += f"{category}: {score}\n"
 st.text(summary_text)
 
-# Display risk category tables
-st.subheader("Market Risk")
-market_risk_data = [result for result in results if result['Category'] == "Market Risk"]
-st.dataframe(pd.DataFrame(market_risk_data))
+# Add Risk Meter (Example for one stock)
+def plot_risk_meter(stock_symbol):
+    stock_info = df[df['Stock Symbol'] == stock_symbol].iloc[0]
+    stock_score = stock_scores.get(stock_symbol, 0)
 
-st.subheader("Financial Risk")
-financial_risk_data = [result for result in results if result['Category'] == "Financial Risk"]
-st.dataframe(pd.DataFrame(financial_risk_data))
+    fig = go.Figure(go.Indicator(
+        mode="gauge+number",
+        value=stock_score,
+        gauge={
+            "axis": {"range": [None, 5]},
+            "bar": {"color": "black"},
+            "steps": [
+                {"range": [0, 2], "color": "green"},
+                {"range": [2, 4], "color": "yellow"},
+                {"range": [4, 5], "color": "red"},
+            ],
+        },
+        title={"text": f"Risk Meter for {stock_symbol}"},
+    ))
+    st.plotly_chart(fig)
 
-st.subheader("Liquidity Risk")
-liquidity_risk_data = [result for result in results if result['Category'] == "Liquidity Risk"]
-st.dataframe(pd.DataFrame(liquidity_risk_data))
+# Display risk meters for selected stocks
+for stock_symbol in selected_stocks:
+    plot_risk_meter(stock_symbol)
 
-# Display best stock based on Investment Score
-if stock_scores:
-    best_stock = max(stock_scores, key=stock_scores.get)
-    best_stock_data = {
-        "Stock Symbol": best_stock,
-        "Investment Score": stock_scores[best_stock]
-    }
-    st.subheader("Best Stock")
-    st.write(best_stock_data)
-
-# Display additional stock metrics
-st.subheader("Additional Stock Metrics")
-metrics_data = metrics_df[metrics_df['Stock Symbol'].isin(selected_stocks)][[ 
-    'Stock Symbol', 'Correlation (Minute)', 'Annualized Alpha (%)', 'Annualized Volatility (%)',
-    'Sharpe Ratio (Daily)', 'Treynor Ratio (Daily)', 'Sortino Ratio (Daily)', 'Maximum Drawdown (Daily)', 
-    'R-Squared (Daily)', 'Downside Deviation (Daily)', 'Tracking Error (%)', 'VaR (95%)', 
-    'Annualized Alpha (Monthly)', 'Annualized Volatility (Monthly)', 'Sharpe Ratio (Monthly)', 
-    'Treynor Ratio (Monthly)', 'Sortino Ratio (Monthly)', 'Maximum Drawdown (Monthly)', 
-    'R-Squared (Monthly)', 'Downside Deviation (Monthly)', 'Tracking Error (%) (Monthly)', 
-    'VaR (95%) (Monthly)', 'Annualized Alpha (Annual)', 'Annualized Volatility (Annual)', 
-    'Sharpe Ratio (Annual)', 'Treynor Ratio (Annual)', 'Sortino Ratio (Annual)', 
-    'Annualized Alpha (Minute)', 'Annualized Volatility (Minute)', 'Sharpe Ratio (Minute)', 
-    'Treynor Ratio (Minute)', 'Sortino Ratio (Minute)', 'Maximum Drawdown (Minute)', 
-    'R-Squared (Minute)', 'Downside Deviation (Minute)', 'Tracking Error (%) (Minute)', 'VaR (95%) (Minute)'
-]].to_dict('records')
-st.dataframe(metrics_data)
-
-# Display risk graphs for each parameter (Market Risk, Financial Risk, Liquidity Risk)
-def plot_risk_graphs(results, category):
-    # Filter results by category
+# Display Pie Charts for Risk Distribution
+def plot_risk_pie_chart(category):
     filtered_results = [r for r in results if r['Category'] == category]
-    param_counts = {}
+    risk_levels = ['Good', 'Neutral', 'Bad', 'Data not available']
+    counts = {risk: 0 for risk in risk_levels}
 
     for result in filtered_results:
-        param = result['Parameter']
-        risk_level = result['Risk Level']
-        if param not in param_counts:
-            param_counts[param] = {"Good": 0, "Neutral": 0, "Bad": 0, "Data not available": 0}
-        param_counts[param][risk_level] += 1
+        counts[result['Risk Level']] += 1
 
-    # Create a bar chart for each parameter
-    for param, counts in param_counts.items():
+    fig = px.pie(names=risk_levels, values=list(counts.values()), title=f"{category} Risk Distribution")
+    st.plotly_chart(fig)
+
+# Display pie charts for each risk category
+for category in risk_categories.keys():
+    plot_risk_pie_chart(category)
+
+# Radar Chart for Stock Metrics Comparison
+def plot_radar_chart(stock_symbols):
+    radar_data = metrics_df[metrics_df['Stock Symbol'].isin(stock_symbols)]
+
+    if not radar_data.empty:
+        radar_metrics = ['Annualized Alpha (%)', 'Sharpe Ratio (Daily)', 'Beta', 'Volatility', 'Profit Margins']
+        radar_data = radar_data[["Stock Symbol"] + radar_metrics]
+
         fig = go.Figure()
-        fig.add_trace(go.Bar(x=list(counts.keys()), y=list(counts.values()), name=param))
-        fig.update_layout(title=f"Risk Distribution for {param} in {category}", xaxis_title="Risk Level", yaxis_title="Count")
+
+        for stock in stock_symbols:
+            stock_data = radar_data[radar_data['Stock Symbol'] == stock].drop(columns="Stock Symbol")
+            fig.add_trace(go.Scatterpolar(
+                r=stock_data.iloc[0],
+                theta=radar_metrics,
+                fill='toself',
+                name=stock
+            ))
+
+        fig.update_layout(
+            polar=dict(
+                radialaxis=dict(visible=True, range=[0, 100]),
+            ),
+            showlegend=True,
+            title="Radar Chart for Stock Metrics Comparison"
+        )
         st.plotly_chart(fig)
 
-# Display risk parameter graphs for each category
-st.subheader("Risk Distribution by Parameter")
-for category in risk_categories.keys():
-    plot_risk_graphs(results, category)
+# Display Radar Chart for selected stocks
+plot_radar_chart(selected_stocks)
 
-# Display investment score bar chart
+# Additional Investment Score Visualization
 investment_data = [{"Stock Symbol": stock, "Investment Score": score} for stock, score in stock_scores.items()]
 investment_df = pd.DataFrame(investment_data)
 fig = px.bar(investment_df, x="Stock Symbol", y="Investment Score", title="Investment Scores for Selected Stocks")
 st.plotly_chart(fig)
-
-# Display total portfolio score
-st.subheader("Total Portfolio Score")
-st.write({
-    "Portfolio Score": total_portfolio_score
-})
