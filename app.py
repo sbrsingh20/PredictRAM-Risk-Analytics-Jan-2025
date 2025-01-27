@@ -188,15 +188,25 @@ def plot_radar_chart(stock_symbols):
 
     if not radar_data.empty:
         radar_metrics = ['Annualized Alpha (%)', 'Sharpe Ratio (Daily)', 'Beta', 'Volatility', 'Profit Margins']
-        radar_data = radar_data[["Stock Symbol"] + radar_metrics]
+        
+        # Check if all radar metrics columns are present in the data
+        existing_columns = [col for col in radar_metrics if col in radar_data.columns]
+
+        if not existing_columns:
+            st.warning("None of the radar metrics are available in the dataset.")
+            return
+        
+        # Filter the data to include only existing columns in radar_metrics
+        radar_data = radar_data[["Stock Symbol"] + existing_columns]
 
         fig = go.Figure()
 
+        # Adding data for each stock
         for stock in stock_symbols:
             stock_data = radar_data[radar_data['Stock Symbol'] == stock].drop(columns="Stock Symbol")
             fig.add_trace(go.Scatterpolar(
                 r=stock_data.iloc[0],
-                theta=radar_metrics,
+                theta=existing_columns,
                 fill='toself',
                 name=stock
             ))
